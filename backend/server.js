@@ -265,6 +265,221 @@ app.get("/users", async (req, res) => {
   }
 });
 
+// ========== ALERT PRIORITIES & STATUSES ==========
+// Get alert priorities
+app.get("/alert-priorities", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM alert_priority ORDER BY priority_id");
+    res.json(rows);
+  } catch (err) {
+    console.error("Get alert priorities error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get alert statuses
+app.get("/alert-statuses", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM alert_status ORDER BY status_id");
+    res.json(rows);
+  } catch (err) {
+    console.error("Get alert statuses error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== ALERTS ==========
+// Get all alerts
+app.get("/alerts", authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT 
+        a.*,
+        ap.level as priority_level,
+        ap.priority_id,
+        ast.status_name,
+        ast.status_id,
+        u.first_name || ' ' || u.last_name as reported_by_name
+      FROM alerts a
+      LEFT JOIN alert_priority ap ON a.priority_id = ap.priority_id
+      LEFT JOIN alert_status ast ON a.status_id = ast.status_id
+      LEFT JOIN users u ON a.reported_by = u.user_id
+      ORDER BY a.created_at DESC
+    `);
+    
+    res.json(rows.map(alert => ({
+      alert_id: alert.alert_id,
+      title: alert.title,
+      description: alert.description,
+      location: alert.location,
+      created_at: alert.created_at,
+      priority: {
+        priority_id: alert.priority_id,
+        level: alert.priority_level
+      },
+      status: {
+        status_id: alert.status_id,
+        status_name: alert.status_name
+      },
+      reported_by: alert.reported_by,
+      reported_by_name: alert.reported_by_name
+    })));
+  } catch (err) {
+    console.error("Get alerts error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get single alert by ID
+app.get("/alerts/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await pool.query(`
+      SELECT 
+        a.*,
+        ap.level as priority_level,
+        ap.priority_id,
+        ast.status_name,
+        ast.status_id,
+        u.first_name || ' ' || u.last_name as reported_by_name
+      FROM alerts a
+      LEFT JOIN alert_priority ap ON a.priority_id = ap.priority_id
+      LEFT JOIN alert_status ast ON a.status_id = ast.status_id
+      LEFT JOIN users u ON a.reported_by = u.user_id
+      WHERE a.alert_id = $1
+    `, [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Alert not found" });
+    }
+    
+    const alert = rows[0];
+    res.json({
+      alert_id: alert.alert_id,
+      title: alert.title,
+      description: alert.description,
+      location: alert.location,
+      created_at: alert.created_at,
+      priority: {
+        priority_id: alert.priority_id,
+        level: alert.priority_level
+      },
+      status: {
+        status_id: alert.status_id,
+        status_name: alert.status_name
+      },
+      reported_by: alert.reported_by,
+      reported_by_name: alert.reported_by_name
+    });
+  } catch (err) {
+    console.error("Get alert error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create new alert
+app.post("/alerts", authenticateToken, async (req, res) => {
+  const { title, description, priority_id, location } = req.body;
+  const reported_by = req.user.user_id; // From JWT token
+
+  if (!title) {
+    return res.status(400).json({ error: "Title is required" });
+  }
+
+  if (!priority_id) {
+    return res.status(400).json({ error: "Priority is required" });
+  }
+
+  try {
+    // Get default status (Active) if status_id not provided
+    let statusResult = await pool.query(
+      "SELECT status_id FROM alert_status WHERE status_name = 'Active' LIMIT 1"
+    );
+    
+    // If no Active status exists, get the first available status
+    if (statusResult.rows.length === 0) {
+      statusResult = await pool.query("SELECT status_id FROM alert_status ORDER BY status_id LIMIT 1");
+    }
+    
+    const status_id = statusResult.rows.length > 0 ? statusResult.rows[0].status_id : null;
+    
+    if (!status_id) {
+      return res.status(500).json({ error: "No alert status found. Please ensure alert_status table has data." });
+    }
+
+    // Insert new alert
+    const { rows } = await pool.query(
+      `INSERT INTO alerts (title, description, reported_by, priority_id, status_id, location)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [title, description || null, reported_by, priority_id, status_id, location || null]
+    );
+
+    // Get full alert data with joins
+    const alertResult = await pool.query(`
+      SELECT 
+        a.*,
+        ap.level as priority_level,
+        ast.status_name
+      FROM alerts a
+      LEFT JOIN alert_priority ap ON a.priority_id = ap.priority_id
+      LEFT JOIN alert_status ast ON a.status_id = ast.status_id
+      WHERE a.alert_id = $1
+    `, [rows[0].alert_id]);
+
+    const alert = alertResult.rows[0];
+
+    res.status(201).json({
+      alert_id: alert.alert_id,
+      title: alert.title,
+      description: alert.description,
+      location: alert.location,
+      created_at: alert.created_at,
+      priority: {
+        priority_id: alert.priority_id,
+        level: alert.priority_level
+      },
+      status: {
+        status_id: alert.status_id,
+        status_name: alert.status_name
+      },
+      reported_by: alert.reported_by
+    });
+  } catch (err) {
+    console.error("Create alert error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update alert status
+app.patch("/alerts/:id/status", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { status_id } = req.body;
+
+  if (!status_id) {
+    return res.status(400).json({ error: "status_id is required" });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE alerts 
+       SET status_id = $1 
+       WHERE alert_id = $2
+       RETURNING *`,
+      [status_id, id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Alert not found" });
+    }
+
+    res.json({ message: "Alert status updated", alert: rows[0] });
+  } catch (err) {
+    console.error("Update alert status error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

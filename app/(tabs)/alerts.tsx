@@ -34,7 +34,7 @@ export default function AlertsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [newAlert, setNewAlert] = useState({ title: '', description: '', priority_id: 1, location: '' });
+  const [newAlert, setNewAlert] = useState({ title: '', description: '', priority_id: 0, location: '' });
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -61,6 +61,14 @@ export default function AlertsScreen() {
       setPriorities(prioritiesData);
       setStatuses(statusesData);
 
+      // Set default priority if none is selected
+      if (prioritiesData.length > 0 && newAlert.priority_id === 0) {
+        // Default to MEDIUM priority if available, otherwise first priority
+        const mediumPriority = prioritiesData.find((p: any) => p.level === 'MEDIUM' || p.level === 'MED');
+        const defaultPriority = mediumPriority || prioritiesData[0];
+        setNewAlert((prev) => ({ ...prev, priority_id: defaultPriority.priority_id }));
+      }
+
       const activeCount = alertsData.filter((a: any) => a.status?.status_name === 'Active').length;
       const inProgressCount = alertsData.filter(
         (a: any) => a.status?.status_name === 'Under Investigation'
@@ -86,15 +94,19 @@ export default function AlertsScreen() {
   };
 
   const handleCreateAlert = async () => {
-    if (!newAlert.title || !newAlert.description || !newAlert.location) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!newAlert.title || !newAlert.priority_id) {
+      Alert.alert('Error', 'Title and priority are required');
       return;
     }
 
     try {
       await api.createAlert(newAlert);
       setShowReportModal(false);
-      setNewAlert({ title: '', description: '', priority_id: 1, location: '' });
+      // Reset form, keeping priority to first available or default
+      const defaultPriority = priorities.length > 0 
+        ? (priorities.find((p: any) => p.level === 'MEDIUM' || p.level === 'MED') || priorities[0]).priority_id
+        : 0;
+      setNewAlert({ title: '', description: '', priority_id: defaultPriority, location: '' });
       loadAlertsData();
       Alert.alert('Success', 'Alert reported successfully');
     } catch (error: any) {
@@ -233,7 +245,7 @@ export default function AlertsScreen() {
               onChangeText={(text) => setNewAlert({ ...newAlert, title: text })}
             />
 
-            <ThemedText style={styles.modalLabel}>Description *</ThemedText>
+            <ThemedText style={styles.modalLabel}>Description</ThemedText>
             <TextInput
               style={[
                 styles.modalInput,
@@ -244,7 +256,7 @@ export default function AlertsScreen() {
                   minHeight: 100,
                 },
               ]}
-              placeholder="Enter alert description"
+              placeholder="Enter alert description (optional)"
               placeholderTextColor={Colors[colorScheme ?? 'light'].icon}
               value={newAlert.description}
               onChangeText={(text) => setNewAlert({ ...newAlert, description: text })}
@@ -253,7 +265,7 @@ export default function AlertsScreen() {
               textAlignVertical="top"
             />
 
-            <ThemedText style={styles.modalLabel}>Location *</ThemedText>
+            <ThemedText style={styles.modalLabel}>Location</ThemedText>
             <TextInput
               style={[
                 styles.modalInput,
@@ -263,52 +275,63 @@ export default function AlertsScreen() {
                   backgroundColor: isDark ? Colors.dark.background : '#f9f9f9',
                 },
               ]}
-              placeholder="Enter location"
+              placeholder="Enter location (optional)"
               placeholderTextColor={Colors[colorScheme ?? 'light'].icon}
               value={newAlert.location}
               onChangeText={(text) => setNewAlert({ ...newAlert, location: text })}
             />
 
-            <ThemedText style={styles.modalLabel}>Priority</ThemedText>
-            <View style={styles.priorityButtons}>
-              {priorities.map((priority) => (
-                <TouchableOpacity
-                  key={priority.priority_id}
-                  style={[
-                    styles.priorityButton,
-                    {
-                      backgroundColor:
-                        newAlert.priority_id === priority.priority_id
-                          ? PriorityColors[priority.level as keyof typeof PriorityColors] || '#888'
-                          : isDark
-                            ? Colors.dark.border
-                            : '#f0f0f0',
-                    },
-                  ]}
-                  onPress={() => setNewAlert({ ...newAlert, priority_id: priority.priority_id })}
-                >
-                  <ThemedText
-                    style={[
-                      styles.priorityButtonText,
-                      {
-                        color:
-                          newAlert.priority_id === priority.priority_id ? '#fff' : Colors[colorScheme ?? 'light'].text,
-                      },
-                    ]}
-                  >
-                    {priority.level}
-                  </ThemedText>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <ThemedText style={styles.modalLabel}>Priority *</ThemedText>
+            {priorities.length === 0 ? (
+              <ThemedText style={styles.helpText}>Loading priorities...</ThemedText>
+            ) : (
+              <View style={styles.priorityButtons}>
+                {priorities.map((priority) => {
+                  const priorityLevel = priority.level?.toUpperCase();
+                  const isSelected = newAlert.priority_id === priority.priority_id;
+                  const priorityColor = PriorityColors[priorityLevel as keyof typeof PriorityColors] || '#888888';
+                  
+                  return (
+                    <TouchableOpacity
+                      key={priority.priority_id}
+                      style={[
+                        styles.priorityButton,
+                        {
+                          backgroundColor: isSelected ? priorityColor : (isDark ? Colors.dark.border : '#f0f0f0'),
+                          borderWidth: isSelected ? 2 : 1,
+                          borderColor: isSelected ? priorityColor : (isDark ? Colors.dark.border : '#e0e0e0'),
+                        },
+                      ]}
+                      onPress={() => setNewAlert({ ...newAlert, priority_id: priority.priority_id })}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.priorityButtonText,
+                          {
+                            color: isSelected ? '#fff' : Colors[colorScheme ?? 'light'].text,
+                            fontWeight: isSelected ? '700' : '600',
+                          },
+                        ]}
+                      >
+                        {priority.level}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowReportModal(false);
-                  setNewAlert({ title: '', description: '', priority_id: 1, location: '' });
-                }}
+                  onPress={() => {
+                    setShowReportModal(false);
+                    // Reset to default priority
+                    const defaultPriority = priorities.length > 0 
+                      ? (priorities.find((p: any) => p.level === 'MEDIUM' || p.level === 'MED') || priorities[0]).priority_id
+                      : 0;
+                    setNewAlert({ title: '', description: '', priority_id: defaultPriority, location: '' });
+                  }}
               >
                 <ThemedText style={styles.modalButtonText}>Cancel</ThemedText>
               </TouchableOpacity>
@@ -418,10 +441,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 8,
     marginBottom: 8,
+    minWidth: 80,
+    alignItems: 'center',
   },
   priorityButtonText: {
     fontWeight: '600',
     fontSize: 14,
+  },
+  helpText: {
+    fontSize: 14,
+    opacity: 0.7,
+    fontStyle: 'italic',
+    marginBottom: 12,
   },
   modalButtons: {
     flexDirection: 'row',
