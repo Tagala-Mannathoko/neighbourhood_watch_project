@@ -19,12 +19,31 @@ export const Colors = {
   },
   dark: {
     text: '#ECEDEE',
-    background: '#151718',
+    background: '#1a1a1a', // TRAKM dark background
     tint: tintColorDark,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    cardBackground: '#252525',
+    border: '#333333',
   },
+};
+
+// TRAKM priority colors
+export const PriorityColors = {
+  HIGH: '#ff4444',
+  MED: '#ff8800',
+  LOW: '#44ff44',
+};
+
+// TRAKM status colors
+export const StatusColors = {
+  Active: '#ff4444',
+  'Under Investigation': '#ff8800',
+  Pending: '#ffaa00',
+  Resolved: '#44ff44',
+  Patrolling: '#00aa44',
+  Unpatrolled: '#888888',
 };
 
 export const Fonts = Platform.select({

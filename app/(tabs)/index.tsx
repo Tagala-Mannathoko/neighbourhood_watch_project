@@ -1,39 +1,83 @@
-import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
-import { Alert, Platform, StyleSheet, TouchableOpacity } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { AlertCard } from '@/components/alert-card';
+import { SidebarMenu } from '@/components/sidebar-menu';
+import { StatCard } from '@/components/stat-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { ZoneCard } from '@/components/zone-card';
+import { Colors } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { Link } from 'expo-router';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { api } from '@/services/api';
 
-export default function HomeScreen() {
-  const { user, logout, isAuthenticated, loading } = useAuth();
+export default function DashboardScreen() {
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [zones, setZones] = useState<any[]>([]);
+  const [statistics, setStatistics] = useState<any>({});
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.replace('/login');
     }
-  }, [isAuthenticated, loading]);
+  }, [isAuthenticated, authLoading]);
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: logout },
-      ]
-    );
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadDashboardData();
+    }
+  }, [isAuthenticated]);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const [alertsData, zonesData, statsData] = await Promise.all([
+        api.getAlerts().catch(() => []),
+        api.getZones().catch(() => []),
+        api.getStatistics().catch(() => ({})),
+      ]);
+
+      setAlerts(alertsData.slice(0, 5)); // Show top 5 alerts
+      setZones(zonesData);
+      setStatistics(statsData);
+    } catch (error: any) {
+      console.error('Error loading dashboard:', error);
+      Alert.alert('Error', 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  if (loading) {
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadDashboardData();
+  };
+
+  if (authLoading || loading) {
     return (
       <ThemedView style={styles.container}>
-        <ThemedText>Loading...</ThemedText>
+        <ActivityIndicator size="large" />
       </ThemedView>
     );
   }
@@ -43,126 +87,232 @@ export default function HomeScreen() {
   }
 
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">
-          Welcome{user?.name ? `, ${user.name}` : user?.first_name ? `, ${user.first_name}` : ''}!
-        </ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.userInfo}>
-        <ThemedText type="subtitle">Account Information</ThemedText>
-        <ThemedText>Email: {user?.email}</ThemedText>
-        {user?.first_name && user?.last_name && (
-          <ThemedText>Name: {user.first_name} {user.last_name}</ThemedText>
-        )}
-        {user?.name && !user?.first_name && <ThemedText>Name: {user.name}</ThemedText>}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <ThemedText style={styles.logoutButtonText}>Logout</ThemedText>
-        </TouchableOpacity>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <ThemedView style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <ThemedText type="title" style={styles.greeting}>
+              Welcome{user?.first_name ? `, ${user.first_name}` : ''}!
+            </ThemedText>
+            <ThemedText style={styles.subtitle}>Neighbourhood Watch Dashboard</ThemedText>
+          </View>
+          <TouchableOpacity onPress={() => setSidebarVisible(true)} style={styles.menuButton}>
+            <Ionicons name="menu-outline" size={28} color={Colors[colorScheme ?? 'light'].text} />
+          </TouchableOpacity>
+        </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
+        {/* Search */}
+        <View style={[styles.searchContainer, { backgroundColor: isDark ? Colors.dark.cardBackground : '#f5f5f5' }]}>
+          <Ionicons name="search" size={20} color={Colors[colorScheme ?? 'light'].icon} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: Colors[colorScheme ?? 'light'].text }]}
+            placeholder="Search alerts, officers, or locations..."
+            placeholderTextColor={Colors[colorScheme ?? 'light'].icon}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+
+        {/* Dashboard Grid */}
+        <View style={styles.gridContainer}>
+          <TouchableOpacity
+            style={[styles.gridCard, { backgroundColor: isDark ? Colors.dark.cardBackground : '#fff' }]}
+            onPress={() => router.push('/(tabs)/patrol')}
+          >
+            <Ionicons name="map" size={32} color="#4CAF50" />
+            <ThemedText style={styles.gridCardText}>Live Patrol Maps</ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.gridCard, { backgroundColor: isDark ? Colors.dark.cardBackground : '#fff' }]}
+            onPress={() => router.push('/(tabs)/reports')}
+          >
+            <Ionicons name="analytics" size={32} color="#2196F3" />
+            <ThemedText style={styles.gridCardText}>Patrol Trends</ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.gridCard, { backgroundColor: isDark ? Colors.dark.cardBackground : '#fff' }]}
+            onPress={() => router.push('/(tabs)/alerts')}
+          >
+            <Ionicons name="alert-circle" size={32} color="#FF5722" />
+            <ThemedText style={styles.gridCardText}>Active Alerts</ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.gridCard, { backgroundColor: isDark ? Colors.dark.cardBackground : '#fff' }]}
+            onPress={() => router.push('/(tabs)/patrol')}
+          >
+            <Ionicons name="qr-code" size={32} color="#9C27B0" />
+            <ThemedText style={styles.gridCardText}>Scan Option</ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        {/* Statistics Bar */}
+        <View style={styles.statsContainer}>
+          <StatCard
+            label="Active Alerts"
+            value={statistics.activeAlerts || alerts.filter(a => a.status?.status_name === 'Active').length || 0}
+            icon={<Ionicons name="alert-circle" size={24} color="#FF5722" />}
+            onPress={() => router.push('/(tabs)/alerts')}
+          />
+          <StatCard
+            label="Active Officers"
+            value={statistics.activeOfficers || 0}
+            icon={<Ionicons name="people" size={24} color="#2196F3" />}
+          />
+          <StatCard
+            label="Weekly Patrols"
+            value={statistics.weeklyPatrols || 0}
+            icon={<Ionicons name="walk" size={24} color="#4CAF50" />}
+          />
+        </View>
+
+        {/* Active Alerts Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Active Alerts
         </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
+            <TouchableOpacity onPress={() => router.push('/(tabs)/alerts')}>
+              <ThemedText style={styles.seeAll}>See All</ThemedText>
+        </TouchableOpacity>
+          </View>
+          {alerts.length === 0 ? (
+            <ThemedText style={styles.emptyText}>No active alerts</ThemedText>
+          ) : (
+            alerts.map((alert) => (
+              <AlertCard
+                key={alert.alert_id}
+                alert={alert}
+                onPress={() => router.push(`/alert-details?id=${alert.alert_id}`)}
+              />
+            ))
+          )}
+        </View>
+
+        {/* Active Zones Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Active Zones
         </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/patrol')}>
+              <ThemedText style={styles.seeAll}>Live Map</ThemedText>
+            </TouchableOpacity>
+          </View>
+          {zones.length === 0 ? (
+            <ThemedText style={styles.emptyText}>No zones available</ThemedText>
+          ) : (
+            zones.map((zone) => (
+              <ZoneCard key={zone.zone_id} zone={zone} onPress={() => router.push(`/zone-details?id=${zone.zone_id}`)} />
+            ))
+          )}
+        </View>
+      </ScrollView>
+      <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  titleContainer: {
+  scrollView: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+  },
+  greeting: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  searchIcon: {
+    marginRight: 12,
   },
-  userInfo: {
-    gap: 8,
-    marginBottom: 16,
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    justifyContent: 'space-between',
+  },
+  gridCard: {
+    width: '48%',
+    aspectRatio: 1.2,
+    borderRadius: 12,
     padding: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(10, 126, 164, 0.1)',
-  },
-  logoutButton: {
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: '#ff4444',
-    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
-  logoutButtonText: {
-    color: '#fff',
+  gridCardText: {
+    marginTop: 12,
+    fontSize: 14,
+    textAlign: 'center',
     fontWeight: '600',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  statsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    justifyContent: 'space-between',
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  seeAll: {
+    fontSize: 14,
+    color: '#0a7ea4',
+    fontWeight: '600',
+  },
+  emptyText: {
+    textAlign: 'center',
+    opacity: 0.5,
+    padding: 20,
   },
 });
