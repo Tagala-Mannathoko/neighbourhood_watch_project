@@ -1,17 +1,55 @@
-# Welcome to your Expo app 👋
+# Neighbourhood Watch Project 👋
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is a React Native app built with Expo that includes user authentication and database integration using Neon PostgreSQL.
 
-## Get started
+## Features
 
-1. Install dependencies
+- User authentication (Login/Signup)
+- JWT-based authentication
+- Secure password storage with bcrypt
+- PostgreSQL database integration via Neon
+- Persistent authentication sessions
 
+## Setup
+
+### Backend Setup
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+
+2. Install backend dependencies:
    ```bash
    npm install
    ```
 
-2. Start the app
+3. The `.env` file is already configured with your Neon database connection string. If you need to update it:
+   ```env
+   PORT=3000
+   DATABASE_URL=your_neon_connection_string
+   JWT_SECRET=your-secret-key-change-this-in-production
+   ```
 
+4. Start the backend server:
+   ```bash
+   npm start
+   ```
+
+   The server will run on `http://localhost:3000` and automatically create the users table on first run.
+
+### Frontend Setup
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Update API URL (if needed):
+   - For local development: Already set to `http://localhost:3000` in `constants/config.ts`
+   - For physical device testing: Change to your computer's IP address (e.g., `http://192.168.1.100:3000`)
+
+3. Start the app:
    ```bash
    npx expo start
    ```
@@ -25,15 +63,37 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
-## Get a fresh project
+## Project Structure
 
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+├── app/
+│   ├── (tabs)/          # Main app screens (protected routes)
+│   ├── login.tsx        # Login screen
+│   ├── signup.tsx       # Signup screen
+│   └── index.tsx        # Root redirect
+├── backend/
+│   ├── server.js        # Express server with auth routes
+│   └── .env             # Environment variables
+├── contexts/
+│   └── AuthContext.tsx  # Authentication context provider
+└── constants/
+    └── config.ts        # API configuration
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## API Endpoints
+
+- `POST /auth/signup` - Create a new user account
+- `POST /auth/login` - Login with email and password
+- `GET /auth/me` - Get current user (protected)
+
+## Database Schema
+
+The users table is automatically created with:
+- `id` (SERIAL PRIMARY KEY)
+- `email` (VARCHAR, UNIQUE)
+- `password` (VARCHAR, hashed with bcrypt)
+- `name` (VARCHAR, optional)
+- `created_at` (TIMESTAMP)
 
 ## Learn more
 
