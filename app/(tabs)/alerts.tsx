@@ -175,7 +175,7 @@ export default function AlertsScreen() {
             onPress={() => setShowReportModal(true)}
           >
             <Ionicons name="add-circle" size={24} color="#fff" />
-            <ThemedText style={styles.actionButtonText}>Report New Alert</ThemedText>
+            <ThemedText style={[styles.actionButtonText, { color: '#fff' }]}>Report New Alert</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: isDark ? Colors.dark.cardBackground : '#f0f0f0' }]}

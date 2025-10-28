@@ -182,7 +182,7 @@ export default function SignupScreen() {
               onPress={handleSignup}
               disabled={loading}
             >
-              <ThemedText style={styles.buttonText}>
+              <ThemedText style={[styles.buttonText, { color: '#fff' }]}>
                 {loading ? 'Creating account...' : 'Sign Up'}
               </ThemedText>
             </TouchableOpacity>

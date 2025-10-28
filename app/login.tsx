@@ -111,7 +111,7 @@ export default function LoginScreen() {
               onPress={handleLogin}
               disabled={loading}
             >
-              <ThemedText style={styles.buttonText}>
+              <ThemedText style={[styles.buttonText, { color: '#fff' }]}>
                 {loading ? 'Signing in...' : 'Sign In'}
               </ThemedText>
             </TouchableOpacity>

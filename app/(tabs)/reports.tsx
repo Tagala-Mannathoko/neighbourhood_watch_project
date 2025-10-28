@@ -308,7 +308,7 @@ export default function ReportsScreen() {
             onPress={() => setShowGenerateModal(true)}
           >
             <Ionicons name="add-circle" size={24} color="#fff" />
-            <ThemedText style={styles.generateButtonText}>Generate Custom Report</ThemedText>
+            <ThemedText style={[styles.generateButtonText, { color: '#fff' }]}>Generate Custom Report</ThemedText>
           </TouchableOpacity>
         </View>
 

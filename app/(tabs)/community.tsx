@@ -169,7 +169,7 @@ export default function CommunityScreen() {
             onPress={() => setShowMessageModal(true)}
           >
             <Ionicons name="megaphone" size={24} color="#fff" />
-            <ThemedText style={styles.actionButtonText}>Quick Message</ThemedText>
+            <ThemedText style={[styles.actionButtonText, { color: '#fff' }]}>Quick Message</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: isDark ? Colors.dark.cardBackground : '#f0f0f0' }]}

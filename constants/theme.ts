@@ -6,7 +6,7 @@
 import { Platform } from 'react-native';
 
 const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+const tintColorDark = '#0a7ea4'; // Use same blue for dark mode buttons (was white)
 
 export const Colors = {
   light: {
